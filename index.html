@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuVault - Password Protected Smart Document Organizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        .pin-dot { transition: all 0.15s ease; }
+        .pin-dot.filled { background-color: #0284c7; border-color: #38bdf8; scale: 1.1; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full overflow-hidden transition-colors duration-200">
+
+    <!-- APP-LEVEL LOCK SCREEN (FIRST RUN SETUP OR AUTH UNLOCK) -->
+    <div id="appLockScreen" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 w-full max-w-md rounded-3xl p-8 border border-slate-800 shadow-2xl text-center relative overflow-hidden">
+            <div class="w-16 h-16 rounded-2xl bg-brand-600 text-white flex items-center justify-center font-bold text-2xl mx-auto mb-4 shadow-lg shadow-brand-500/30">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            
+            <h2 id="authScreenTitle" class="text-2xl font-bold text-white mb-1">Unlock DocuVault</h2>
+            <p id="authScreenSubtitle" class="text-xs text-slate-400 mb-4">Enter your master passcode to access your documents</p>
+
+            <!-- PIN LENGTH SELECTOR -->
+            <div id="pinLengthOption" class="flex justify-center items-center gap-3 mb-5">
+                <span class="text-xs text-slate-400 font-medium">Passcode Digits:</span>
+                <button type="button" onclick="setPasscodeLength(4)" id="lenBtn4" class="px-3 py-1 text-xs rounded-lg bg-brand-600 text-white font-bold border border-brand-500">4 Digits</button>
+                <button type="button" onclick="setPasscodeLength(6)" id="lenBtn6" class="px-3 py-1 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold border border-slate-700">6 Digits</button>
+            </div>
+
+            <!-- PIN DISPLAY DOTS -->
+            <div id="pinDotsContainer" class="flex justify-center space-x-3 mb-6">
+                <!-- Populated dynamically based on 4 or 6 digit setting -->
+            </div>
+
+            <!-- KEYPAD -->
+            <div class="grid grid-cols-3 gap-3 max-w-xs mx-auto mb-6">
+                <button onclick="pressKeypad('1')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">1</button>
+                <button onclick="pressKeypad('2')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">2</button>
+                <button onclick="pressKeypad('3')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">3</button>
+                <button onclick="pressKeypad('4')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">4</button>
+                <button onclick="pressKeypad('5')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">5</button>
+                <button onclick="pressKeypad('6')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">6</button>
+                <button onclick="pressKeypad('7')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">7</button>
+                <button onclick="pressKeypad('8')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">8</button>
+                <button onclick="pressKeypad('9')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">9</button>
+                <button onclick="clearKeypad()" class="py-3 bg-slate-800/50 hover:bg-slate-800 text-slate-400 rounded-2xl text-xs font-semibold uppercase tracking-wider">Clear</button>
+                <button onclick="pressKeypad('0')" class="py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl text-xl font-bold transition">0</button>
+                <button onclick="deleteKeypadDigit()" class="py-3 bg-slate-800/50 hover:bg-slate-800 text-slate-400 rounded-2xl text-sm transition"><i class="fa-solid fa-backspace"></i></button>
+            </div>
+
+            <!-- ERROR MSG -->
+            <p id="authErrorMsg" class="text-rose-500 text-xs font-semibold hidden mb-4"><i class="fa-solid fa-circle-exclamation mr-1"></i> Incorrect passcode</p>
+
+            <button id="resetPasscodeBtn" onclick="triggerResetPasscode()" class="text-xs text-slate-500 hover:text-slate-300 underline">Reset Vault Data & Passcode</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="mainApp" class="h-full flex flex-col md:flex-row overflow-hidden bg-slate-900 text-slate-100">
+
+        <!-- Mobile Header -->
+        <header class="md:hidden bg-slate-800 border-b border-slate-700 p-4 flex items-center justify-between z-20">
+            <div class="flex items-center space-x-2">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                    <i class="fa-solid font-bold fa-box-archive"></i>
+                </div>
+                <span class="font-bold text-xl tracking-tight text-white">DocuVault</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openPasscodeChangeModal()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-700 text-xs flex items-center gap-1" title="Passcode Settings">
+                    <i class="fa-solid fa-key text-brand-400"></i>
+                </button>
+                <button onclick="lockApp()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-700 text-xs flex items-center gap-1">
+                    <i class="fa-solid fa-lock text-rose-400"></i>
+                </button>
+                <button id="mobileMenuBtn" onclick="toggleMobileSidebar()" class="p-2 rounded-lg text-slate-300 hover:bg-slate-700">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-slate-800 border-r border-slate-700 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between md:relative md:flex shrink-0">
+            <div class="p-5 overflow-y-auto">
+                <!-- App Logo -->
+                <div class="hidden md:flex items-center space-x-3 mb-8">
+                    <div class="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-brand-500/20">
+                        <i class="fa-solid fa-box-archive"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-xl tracking-tight text-white">DocuVault</h1>
+                        <p class="text-xs text-slate-400 font-medium">Smart Protected Hub</p>
+                    </div>
+                </div>
+
+                <!-- Upload Button -->
+                <button onclick="openUploadModal()" class="w-full mb-6 py-3 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium shadow-lg shadow-brand-600/20 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Upload Document</span>
+                </button>
+
+                <!-- Main Nav Section -->
+                <div class="space-y-1">
+                    <p class="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Main</p>
+                    <a href="#" onclick="switchView('dashboard')" data-view="dashboard" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-700/50 active-nav">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-chart-pie w-5 text-center text-slate-400"></i>
+                            <span>Dashboard</span>
+                        </div>
+                    </a>
+                    <a href="#" onclick="switchView('documents')" data-view="documents" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-file-lines w-5 text-center text-slate-400"></i>
+                            <span>All Documents</span>
+                        </div>
+                        <span id="allDocCountBadge" class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                    </a>
+
+                    <!-- Needs Renewal Section -->
+                    <a href="#" onclick="switchView('renewal')" data-view="renewal" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-rose-300 bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/40 transition">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-folder-minus w-5 text-center text-rose-500 text-base"></i>
+                            <span class="font-bold text-rose-200">Needs Renewal</span>
+                        </div>
+                        <span id="needsRenewalBadge" class="bg-rose-600 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-sm shadow-rose-600/50">0</span>
+                    </a>
+
+                    <a href="#" onclick="switchView('expiring')" data-view="expiring" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-clock-rotate-left w-5 text-center text-amber-500"></i>
+                            <span>Expiring Soon</span>
+                        </div>
+                        <span id="expiringBadge" class="bg-amber-900/40 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                    </a>
+                    <a href="#" onclick="switchView('favorites')" data-view="favorites" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-star w-5 text-center text-yellow-500"></i>
+                            <span>Starred / Favorites</span>
+                        </div>
+                        <span id="favoritesBadge" class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                    </a>
+                    <a href="#" onclick="switchView('vault')" data-view="vault" class="nav-item flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-slate-200 hover:bg-slate-700/50">
+                        <div class="flex items-center space-x-3">
+                            <i class="fa-solid fa-shield-halved w-5 text-center text-rose-500"></i>
+                            <span>Private Vault</span>
+                        </div>
+                        <i class="fa-solid fa-lock text-xs text-slate-400"></i>
+                    </a>
+                </div>
+
+                <!-- Dynamic Category Nav -->
+                <div class="mt-8 space-y-1">
+                    <div class="flex items-center justify-between px-3 mb-2">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Categories</p>
+                        <button onclick="openCategoryManageModal()" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-gear"></i> Edit
+                        </button>
+                    </div>
+                    <div id="categoryNavList" class="space-y-0.5">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t border-slate-700 flex items-center justify-between bg-slate-800/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
+                        <i class="fa-solid fa-user-shield text-xs text-brand-400"></i>
+                    </div>
+                    <div class="text-xs">
+                        <p class="font-semibold text-slate-200">Encrypted Vault</p>
+                        <p class="text-slate-400 text-[10px]" id="sidebarPasscodeLabel">4-Digit Passcode</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button onclick="openPasscodeChangeModal()" title="Passcode Settings" class="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-brand-400 transition">
+                        <i class="fa-solid fa-key"></i>
+                    </button>
+                    <button onclick="lockApp()" title="Lock Session" class="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-rose-400 transition">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile Overlay -->
+        <div id="mobileOverlay" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-20 hidden md:hidden"></div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-900">
+            
+            <!-- Top Search Header -->
+            <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between gap-4">
+                <div class="flex-1 max-w-2xl relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="globalSearchInput" onkeyup="handleGlobalSearch()" placeholder="Search files, keywords, notes, document type..." class="w-full pl-10 pr-10 py-2 bg-slate-700/50 border border-slate-600 rounded-xl text-sm focus:outline-none focus:bg-slate-800 focus:border-brand-500 text-slate-100 transition-all">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button onclick="openPasscodeChangeModal()" class="px-3 py-2 bg-slate-700/60 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-600 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-key text-brand-400"></i>
+                        <span class="hidden sm:inline">Passcode Settings</span>
+                    </button>
+                    <button onclick="lockApp()" class="px-3 py-2 bg-slate-700/60 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold border border-slate-600 transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-lock text-rose-400"></i>
+                        <span class="hidden sm:inline">Lock Session</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Scrollable View Container -->
+            <div id="contentArea" class="flex-1 overflow-y-auto p-4 md:p-8">
+                
+                <!-- DASHBOARD VIEW -->
+                <section id="view-dashboard" class="view-panel space-y-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Document Dashboard</h2>
+                            <p class="text-sm text-slate-400">Overview of protected files, storage usage, and expirations.</p>
+                        </div>
+                        <div class="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 self-start flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-emerald-400"></i> Master Passcode Enabled
+                        </div>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700/80 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-3">
+                                <span class="text-xs font-semibold uppercase tracking-wider">Total Docs</span>
+                                <div class="w-8 h-8 rounded-lg bg-blue-900/30 text-blue-400 flex items-center justify-center">
+                                    <i class="fa-solid fa-folder"></i>
+                                </div>
+                            </div>
+                            <p id="statTotalDocs" class="text-2xl font-bold text-white">0</p>
+                        </div>
+
+                        <!-- RED BOX BANNER STAT FOR NEEDS RENEWAL -->
+                        <div class="bg-rose-950/30 p-5 rounded-2xl border border-rose-800/80 shadow-sm cursor-pointer hover:border-rose-600 transition" onclick="switchView('renewal')">
+                            <div class="flex items-center justify-between text-rose-300 mb-3">
+                                <span class="text-xs font-bold uppercase tracking-wider">Needs Renewal</span>
+                                <div class="w-8 h-8 rounded-lg bg-rose-900/50 text-rose-400 flex items-center justify-center">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                            </div>
+                            <p id="statNeedsRenewalDocs" class="text-2xl font-bold text-rose-400">0</p>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700/80 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-3">
+                                <span class="text-xs font-semibold uppercase tracking-wider">Starred Items</span>
+                                <div class="w-8 h-8 rounded-lg bg-yellow-900/30 text-yellow-400 flex items-center justify-center">
+                                    <i class="fa-solid fa-star"></i>
+                                </div>
+                            </div>
+                            <p id="statFavoriteDocs" class="text-2xl font-bold text-white">0</p>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700/80 shadow-sm">
+                            <div class="flex items-center justify-between text-slate-400 mb-3">
+                                <span class="text-xs font-semibold uppercase tracking-wider">In Vault</span>
+                                <div class="w-8 h-8 rounded-lg bg-emerald-900/30 text-emerald-400 flex items-center justify-center">
+                                    <i class="fa-solid fa-user-lock"></i>
+                                </div>
+                            </div>
+                            <p id="statVaultDocs" class="text-2xl font-bold text-white">0</p>
+                        </div>
+                    </div>
+
+                    <!-- Smart Alert Banner for Needs Renewal Box -->
+                    <div class="bg-rose-900/20 border border-rose-800/60 rounded-2xl p-5 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-white text-base">Needs Renewal Folder</h3>
+                                    <p class="text-xs text-rose-300">Items nearing their rule thresholds automatically move here.</p>
+                                </div>
+                            </div>
+                            <button onclick="switchView('renewal')" class="text-xs font-bold text-rose-400 hover:text-rose-300 underline">Open Folder &rarr;</button>
+                        </div>
+                        <div id="dashRenewalList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Main Grid: Recently Added & Essential Docs -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-slate-800 rounded-2xl p-5 border border-slate-700/80 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-white">Recently Uploaded</h3>
+                                <button onclick="switchView('documents')" class="text-xs font-semibold text-brand-400 hover:underline">Browse All</button>
+                            </div>
+                            <div id="recentDocsList" class="divide-y divide-slate-700/50">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Missing/Required Documents Checklist -->
+                        <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700/80 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-bold text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-list-check text-brand-400"></i> Essential Vault Items
+                                    </h3>
+                                    <span class="text-xs bg-brand-900/30 text-brand-400 px-2 py-0.5 rounded font-medium">Checklist</span>
+                                </div>
+                                <p class="text-xs text-slate-400 mb-4">Keep your core identity & assets safely archived.</p>
+                                
+                                <div id="missingChecklist" class="space-y-3">
+                                    <!-- JS Populated Checklist -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- NEEDS RENEWAL VIEW -->
+                <section id="view-renewal" class="view-panel hidden space-y-6">
+                    <div class="bg-rose-950/40 border border-rose-800 rounded-2xl p-6">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold text-xl">
+                                <i class="fa-solid fa-folder-minus"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold text-rose-100">Needs Renewal Folder</h2>
+                                <p class="text-xs text-rose-300">Documents nearing their assigned rule thresholds are highlighted here.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="renewalGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- JS Populated -->
+                    </div>
+                </section>
+
+                <!-- ALL DOCUMENTS VIEW -->
+                <section id="view-documents" class="view-panel hidden space-y-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 id="docViewTitle" class="text-2xl font-bold text-white">All Documents</h2>
+                            <p class="text-sm text-slate-400">Filter, search, organize, and view all registered files.</p>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <select id="categoryFilter" onchange="renderDocuments()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-brand-500">
+                                <option value="ALL">All Categories</option>
+                            </select>
+
+                            <select id="sortBySelect" onchange="renderDocuments()" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-brand-500">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                                <option value="title">Title A-Z</option>
+                                <option value="expiry">Expiration Date</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="documentGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+
+                    <div id="noDocsState" class="hidden text-center py-16 bg-slate-800 rounded-2xl border border-dashed border-slate-700">
+                        <div class="w-16 h-16 rounded-full bg-slate-700 text-slate-400 flex items-center justify-center mx-auto mb-4 text-2xl">
+                            <i class="fa-regular fa-folder-open"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-200 text-lg">No documents found</h3>
+                        <p class="text-sm text-slate-400 mt-1 max-w-sm mx-auto">Try adjusting search criteria or upload a new file.</p>
+                        <button onclick="openUploadModal()" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition">
+                            Upload Document
+                        </button>
+                    </div>
+                </section>
+
+                <!-- EXPIRING SOON VIEW -->
+                <section id="view-expiring" class="view-panel hidden space-y-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Expiration Tracker</h2>
+                        <p class="text-sm text-slate-400">Track all upcoming document expiration dates across your vault.</p>
+                    </div>
+
+                    <div id="expiryList" class="space-y-3">
+                        <!-- JS Populated -->
+                    </div>
+                </section>
+
+                <!-- FAVORITES VIEW -->
+                <section id="view-favorites" class="view-panel hidden space-y-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Starred Documents</h2>
+                        <p class="text-sm text-slate-400">Your prioritized, frequently accessed files.</p>
+                    </div>
+                    <div id="favoritesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- JS Populated -->
+                    </div>
+                </section>
+
+                <!-- PRIVATE VAULT VIEW -->
+                <section id="view-vault" class="view-panel hidden space-y-6">
+                    <div id="vaultLockScreen" class="max-w-md mx-auto py-12 text-center bg-slate-800 rounded-3xl border border-slate-700 p-8 shadow-xl">
+                        <div class="w-20 h-20 rounded-full bg-rose-900/30 text-rose-400 flex items-center justify-center mx-auto mb-6 text-3xl border border-rose-800/40">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-white mb-2">Private Vault Locked</h2>
+                        <p class="text-xs text-slate-400 mb-6">Confirm master passcode to view double-encrypted private files.</p>
+
+                        <button onclick="promptVaultUnlock()" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl transition shadow-lg shadow-rose-600/20">
+                            Unlock Vault Section
+                        </button>
+                    </div>
+
+                    <div id="vaultUnlockedContent" class="hidden space-y-6">
+                        <div class="flex items-center justify-between bg-emerald-900/20 border border-emerald-800/40 p-4 rounded-2xl">
+                            <div class="flex items-center space-x-3">
+                                <i class="fa-solid fa-lock-open text-emerald-400 text-xl"></i>
+                                <div>
+                                    <h3 class="font-bold text-white">Vault Unlocked</h3>
+                                    <p class="text-xs text-slate-400">Showing private / sensitive documents</p>
+                                </div>
+                            </div>
+                            <button onclick="relockVaultSection()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 rounded-lg border border-slate-700">
+                                Relock Vault
+                            </button>
+                        </div>
+                        <div id="vaultGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <!-- JS Populated -->
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: UPLOAD / ADD DOCUMENT MODAL -->
+    <div id="uploadModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-circle-plus text-brand-500"></i> Upload New Document
+                </h3>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="docForm" onsubmit="handleDocSubmit(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Document Title *</label>
+                    <input type="text" id="docTitle" required placeholder="e.g. US Passport, Tesla Registration" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Document Type *</label>
+                        <!-- Updated Dropdown values per Requirement 1 -->
+                        <select id="docType" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <option value="6-mo Rule">6-mo Rule</option>
+                            <option value="3-mo Rule">3-mo Rule</option>
+                            <option value="1-mo Rule">1-mo Rule</option>
+                            <option value="General">General</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Category *</label>
+                        <select id="docCategory" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Expiration Date</label>
+                        <input type="date" id="docExpiryDate" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    </div>
+
+                    <div class="flex items-center pt-5">
+                        <label class="flex items-center cursor-pointer gap-2 text-xs font-semibold text-slate-300">
+                            <input type="checkbox" id="docIsPrivate" class="rounded bg-slate-800 border-slate-700 text-brand-600 focus:ring-0 w-4 h-4">
+                            <span>Store in Private Vault</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Notes / Reminders</label>
+                    <textarea id="docNotes" rows="2" placeholder="Account numbers, renewal notes, location of physical copy..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-3">
+                    <button type="button" onclick="closeUploadModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-500 shadow-lg shadow-brand-600/30">Save Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: MANAGE CATEGORIES MODAL -->
+    <div id="categoryManageModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                    <i class="fa-solid fa-tags text-brand-500"></i> Manage Categories
+                </h3>
+                <button onclick="closeCategoryManageModal()" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <form onsubmit="handleAddCategory(event)" class="flex gap-2">
+                    <input type="text" id="newCategoryInput" required placeholder="New category name..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500">
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition">Add</button>
+                </form>
+
+                <div class="border-t border-slate-800 pt-4">
+                    <p class="text-xs font-semibold text-slate-400 mb-2">Existing Categories</p>
+                    <div id="categoryManageList" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        <!-- Dynamic list with delete buttons -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PASSCODE / SETTINGS MODAL -->
+    <div id="passcodeSettingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-brand-600/20 text-brand-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <h3 class="font-bold text-lg text-white">Passcode Settings</h3>
+            <p class="text-xs text-slate-400">Change your master passcode and choose preferred passcode length.</p>
+
+            <div class="flex justify-center items-center gap-3 py-2 bg-slate-800 rounded-xl border border-slate-700">
+                <span class="text-xs text-slate-300 font-medium">Select Length:</span>
+                <button type="button" onclick="setPasscodeLength(4)" id="settingLenBtn4" class="px-3 py-1 text-xs rounded-lg font-bold border">4 Digits</button>
+                <button type="button" onclick="setPasscodeLength(6)" id="settingLenBtn6" class="px-3 py-1 text-xs rounded-lg font-semibold border">6 Digits</button>
+            </div>
+
+            <div class="space-y-3 text-left">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">New Passcode</label>
+                    <input type="password" id="newPasscodeInput" placeholder="Enter new passcode" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-center tracking-widest text-white">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closePasscodeChangeModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold">Cancel</button>
+                <button type="button" onclick="saveNewPasscode()" class="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-500">Save Passcode</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // GLOBAL APP STATE
+        const DEFAULT_CATEGORIES = ['Identity', 'Vehicle & Transport', 'Legal & Property', 'Financial', 'Medical & Health'];
+        
+        let appState = {
+            passcode: localStorage.getItem('dv_passcode') || null,
+            pinLength: parseInt(localStorage.getItem('dv_pin_length') || '4'),
+            categories: JSON.parse(localStorage.getItem('dv_categories')) || DEFAULT_CATEGORIES,
+            documents: JSON.parse(localStorage.getItem('dv_documents')) || [
+                {
+                    id: 'doc-1',
+                    title: 'US Passport',
+                    type: '6-mo Rule',
+                    category: 'Identity',
+                    expiryDate: getRelativeDateMonths(4), // 4 months away -> triggers 6-month rule
+                    isPrivate: false,
+                    isFavorite: true,
+                    notes: 'Renew via State Dept online portal.'
+                },
+                {
+                    id: 'doc-2',
+                    title: 'Tesla Registration',
+                    type: '3-mo Rule',
+                    category: 'Vehicle & Transport',
+                    expiryDate: getRelativeDateMonths(2), // 2 months away -> triggers 3-month rule
+                    isPrivate: false,
+                    isFavorite: false,
+                    notes: 'DMV renewal notice arrives by mail.'
+                },
+                {
+                    id: 'doc-3',
+                    title: 'Driver License',
+                    type: '3-mo Rule',
+                    category: 'Identity',
+                    expiryDate: getRelativeDateMonths(10), // 10 months away -> safe
+                    isPrivate: true,
+                    isFavorite: true,
+                    notes: 'RealID verified copy.'
+                }
+            ]
+        };
+
+        let currentPinInput = '';
+        let currentView = 'dashboard';
+        let isVaultUnlocked = false;
+
+        // HELPER DATE UTILITY
+        function getRelativeDateMonths(months) {
+            const d = new Date();
+            d.setMonth(d.getMonth() + months);
+            return d.toISOString().split('T')[0];
+        }
+
+        // INITIALIZATION
+        window.addEventListener('DOMContentLoaded', () => {
+            initAuthScreen();
+            renderCategories();
+            updateStatsAndBadges();
+            renderDashboard();
+        });
+
+        // ==========================================
+        // 1. PASSCODE & AUTHENTICATION
+        // ==========================================
+        function initAuthScreen() {
+            const isFirstRun = !appState.passcode;
+            const title = document.getElementById('authScreenTitle');
+            const subtitle = document.getElementById('authScreenSubtitle');
+            
+            if (isFirstRun) {
+                title.innerText = "Create Master Passcode";
+                subtitle.innerText = "Choose a 4-digit or 6-digit PIN to secure your DocuVault";
+            } else {
+                title.innerText = "Unlock DocuVault";
+                subtitle.innerText = "Enter your master passcode to access your documents";
+            }
+
+            setPasscodeLength(appState.pinLength, false);
+            updateSidebarPasscodeLabel();
+        }
+
+        function setPasscodeLength(length, save = true) {
+            appState.pinLength = length;
+            if (save) localStorage.setItem('dv_pin_length', length.toString());
+
+            const btn4 = document.getElementById('lenBtn4');
+            const btn6 = document.getElementById('lenBtn6');
+            if (btn4 && btn6) {
+                btn4.className = length === 4 ? "px-3 py-1 text-xs rounded-lg bg-brand-600 text-white font-bold border border-brand-500" : "px-3 py-1 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold border border-slate-700";
+                btn6.className = length === 6 ? "px-3 py-1 text-xs rounded-lg bg-brand-600 text-white font-bold border border-brand-500" : "px-3 py-1 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold border border-slate-700";
+            }
+
+            const sBtn4 = document.getElementById('settingLenBtn4');
+            const sBtn6 = document.getElementById('settingLenBtn6');
+            if (sBtn4 && sBtn6) {
+                sBtn4.className = length === 4 ? "px-3 py-1 text-xs rounded-lg bg-brand-600 text-white font-bold border border-brand-500" : "px-3 py-1 text-xs rounded-lg bg-slate-800 text-slate-300 border border-slate-700";
+                sBtn6.className = length === 6 ? "px-3 py-1 text-xs rounded-lg bg-brand-600 text-white font-bold border border-brand-500" : "px-3 py-1 text-xs rounded-lg bg-slate-800 text-slate-300 border border-slate-700";
+            }
+
+            clearKeypad();
+            renderPinDots();
+            updateSidebarPasscodeLabel();
+        }
+
+        function renderPinDots() {
+            const container = document.getElementById('pinDotsContainer');
+            container.innerHTML = '';
+            for (let i = 0; i < appState.pinLength; i++) {
+                const dot = document.createElement('div');
+                dot.className = `w-4 h-4 rounded-full border-2 border-slate-600 pin-dot ${i < currentPinInput.length ? 'filled' : ''}`;
+                container.appendChild(dot);
+            }
+        }
+
+        function pressKeypad(num) {
+            if (currentPinInput.length < appState.pinLength) {
+                currentPinInput += num;
+                renderPinDots();
+
+                if (currentPinInput.length === appState.pinLength) {
+                    setTimeout(submitPasscode, 150);
+                }
+            }
+        }
+
+        function deleteKeypadDigit() {
+            currentPinInput = currentPinInput.slice(0, -1);
+            renderPinDots();
+        }
+
+        function clearKeypad() {
+            currentPinInput = '';
+            renderPinDots();
+            document.getElementById('authErrorMsg').classList.add('hidden');
+        }
+
+        function submitPasscode() {
+            const isFirstRun = !appState.passcode;
+
+            if (isFirstRun) {
+                appState.passcode = currentPinInput;
+                localStorage.setItem('dv_passcode', appState.passcode);
+                document.getElementById('appLockScreen').classList.add('hidden');
+            } else {
+                if (currentPinInput === appState.passcode) {
+                    document.getElementById('appLockScreen').classList.add('hidden');
+                    clearKeypad();
+                } else {
+                    document.getElementById('authErrorMsg').classList.remove('hidden');
+                    currentPinInput = '';
+                    renderPinDots();
+                }
+            }
+        }
+
+        function lockApp() {
+            currentPinInput = '';
+            isVaultUnlocked = false;
+            document.getElementById('vaultUnlockedContent')?.classList.add('hidden');
+            document.getElementById('vaultLockScreen')?.classList.remove('hidden');
+            initAuthScreen();
+            document.getElementById('appLockScreen').classList.remove('hidden');
+        }
+
+        function triggerResetPasscode() {
+            if (confirm("Are you sure you want to reset your passcode and vault storage?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function updateSidebarPasscodeLabel() {
+            const label = document.getElementById('sidebarPasscodeLabel');
+            if (label) label.innerText = `${appState.pinLength}-Digit Passcode`;
+        }
+
+        function openPasscodeChangeModal() {
+            document.getElementById('passcodeSettingsModal').classList.remove('hidden');
+        }
+
+        function closePasscodeChangeModal() {
+            document.getElementById('passcodeSettingsModal').classList.add('hidden');
+        }
+
+        function saveNewPasscode() {
+            const val = document.getElementById('newPasscodeInput').value.trim();
+            if (val.length !== appState.pinLength || !/^\d+$/.test(val)) {
+                alert(`Passcode must be exactly ${appState.pinLength} numerical digits.`);
+                return;
+            }
+            appState.passcode = val;
+            localStorage.setItem('dv_passcode', val);
+            closePasscodeChangeModal();
+            alert("Passcode successfully updated!");
+        }
+
+        // ==========================================
+        // 2. DYNAMIC CATEGORY MANAGEMENT
+        // ==========================================
+        function renderCategories() {
+            const navList = document.getElementById('categoryNavList');
+            const docCatSelect = document.getElementById('docCategory');
+            const catFilter = document.getElementById('categoryFilter');
+
+            navList.innerHTML = '';
+            docCatSelect.innerHTML = '';
+            catFilter.innerHTML = '<option value="ALL">All Categories</option>';
+
+            appState.categories.forEach(cat => {
+                const catItem = document.createElement('a');
+                catItem.href = "#";
+                catItem.className = "flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-300 hover:bg-slate-700/50 hover:text-white transition";
+                catItem.onclick = () => {
+                    switchView('documents');
+                    document.getElementById('categoryFilter').value = cat;
+                    renderDocuments();
+                };
+                catItem.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-folder text-slate-500"></i>
+                        <span>${cat}</span>
+                    </div>
+                    <span class="text-[10px] bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-400 font-bold">${getCategoryDocCount(cat)}</span>
+                `;
+                navList.appendChild(catItem);
+
+                const opt1 = document.createElement('option');
+                opt1.value = cat;
+                opt1.innerText = cat;
+                docCatSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = cat;
+                opt2.innerText = cat;
+                catFilter.appendChild(opt2);
+            });
+        }
+
+        function getCategoryDocCount(cat) {
+            return appState.documents.filter(d => d.category === cat).length;
+        }
+
+        function openCategoryManageModal() {
+            renderManageCategoryList();
+            document.getElementById('categoryManageModal').classList.remove('hidden');
+        }
+
+        function closeCategoryManageModal() {
+            document.getElementById('categoryManageModal').classList.add('hidden');
+        }
+
+        function renderManageCategoryList() {
+            const list = document.getElementById('categoryManageList');
+            list.innerHTML = '';
+
+            appState.categories.forEach(cat => {
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between bg-slate-800 p-2 rounded-xl text-xs text-slate-200 border border-slate-700/60";
+                row.innerHTML = `
+                    <span>${cat}</span>
+                    <button onclick="deleteCategory('${cat}')" class="text-slate-400 hover:text-rose-400 p-1 transition" title="Delete Category">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function handleAddCategory(e) {
+            e.preventDefault();
+            const input = document.getElementById('newCategoryInput');
+            const newCat = input.value.trim();
+
+            if (newCat && !appState.categories.includes(newCat)) {
+                appState.categories.push(newCat);
+                saveCategories();
+                input.value = '';
+                renderManageCategoryList();
+                renderCategories();
+            }
+        }
+
+        function deleteCategory(cat) {
+            if (confirm(`Delete category "${cat}"? Documents in this category will remain.`)) {
+                appState.categories = appState.categories.filter(c => c !== cat);
+                saveCategories();
+                renderManageCategoryList();
+                renderCategories();
+            }
+        }
+
+        function saveCategories() {
+            localStorage.setItem('dv_categories', JSON.stringify(appState.categories));
+        }
+
+        // ==========================================
+        // 3. SMART EXPIRATION & "NEEDS RENEWAL" LOGIC
+        // ==========================================
+        // Evaluates rules based directly on type selections (or legacy title checks)
+        function isDocumentNeedingRenewal(doc) {
+            if (!doc.expiryDate) return false;
+
+            const expiry = new Date(doc.expiryDate);
+            const today = new Date();
+            const diffTime = expiry - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            const type = (doc.type || '').toLowerCase();
+
+            if (type.includes('6-mo') || type.includes('6 mo') || type.includes('passport')) {
+                return diffDays <= 180; // 6 months threshold
+            } else if (type.includes('3-mo') || type.includes('3 mo') || type.includes('vehicle') || type.includes('license')) {
+                return diffDays <= 90;  // 3 months threshold
+            } else if (type.includes('1-mo') || type.includes('1 mo')) {
+                return diffDays <= 30;  // 1 month threshold
+            } else {
+                return diffDays <= 30;  // Default fallback 30 days
+            }
+        }
+
+        function getRenewalThresholdLabel(type) {
+            const t = (type || '').toLowerCase();
+            if (t.includes('6-mo') || t.includes('6 mo') || t.includes('passport')) return "6 Months Rule";
+            if (t.includes('3-mo') || t.includes('3 mo') || t.includes('vehicle') || t.includes('license')) return "3 Months Rule";
+            if (t.includes('1-mo') || t.includes('1 mo')) return "1 Month Rule";
+            return "General Rule";
+        }
+
+        // ==========================================
+        // 4. RENDERING VIEWS & DASHBOARD
+        // ==========================================
+        function updateStatsAndBadges() {
+            const allDocs = appState.documents;
+            const renewalDocs = allDocs.filter(isDocumentNeedingRenewal);
+            const favoriteDocs = allDocs.filter(d => d.isFavorite);
+            const vaultDocs = allDocs.filter(d => d.isPrivate);
+
+            document.getElementById('statTotalDocs').innerText = allDocs.length;
+            document.getElementById('statNeedsRenewalDocs').innerText = renewalDocs.length;
+            document.getElementById('statFavoriteDocs').innerText = favoriteDocs.length;
+            document.getElementById('statVaultDocs').innerText = vaultDocs.length;
+
+            document.getElementById('allDocCountBadge').innerText = allDocs.length;
+            document.getElementById('needsRenewalBadge').innerText = renewalDocs.length;
+            document.getElementById('expiringBadge').innerText = renewalDocs.length;
+            document.getElementById('favoritesBadge').innerText = favoriteDocs.length;
+        }
+
+        function renderDashboard() {
+            const renewalList = document.getElementById('dashRenewalList');
+            const renewalDocs = appState.documents.filter(isDocumentNeedingRenewal);
+
+            renewalList.innerHTML = '';
+            if (renewalDocs.length === 0) {
+                renewalList.innerHTML = `<p class="text-xs text-slate-400 col-span-3 py-2"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> All documents are up to date!</p>`;
+            } else {
+                renewalDocs.slice(0, 3).forEach(doc => {
+                    const card = document.createElement('div');
+                    card.className = "bg-slate-900/80 border border-rose-800/80 p-3 rounded-xl flex justify-between items-center";
+                    card.innerHTML = `
+                        <div>
+                            <p class="font-bold text-xs text-white">${doc.title}</p>
+                            <p class="text-[10px] text-rose-300">Expires: ${doc.expiryDate || 'N/A'}</p>
+                        </div>
+                        <span class="text-[10px] bg-rose-600/30 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded font-bold">${getRenewalThresholdLabel(doc.type)}</span>
+                    `;
+                    renewalList.appendChild(card);
+                });
+            }
+
+            // Recent docs
+            const recentList = document.getElementById('recentDocsList');
+            recentList.innerHTML = '';
+            appState.documents.slice(0, 4).forEach(doc => {
+                const item = document.createElement('div');
+                item.className = "py-3 flex justify-between items-center";
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-lg ${doc.isPrivate ? 'bg-emerald-950 text-emerald-400' : 'bg-slate-700 text-brand-400'} flex items-center justify-center text-xs">
+                            <i class="fa-solid ${doc.isPrivate ? 'fa-lock' : 'fa-file'}"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-white">${doc.title}</p>
+                            <p class="text-[10px] text-slate-400">${doc.category} • ${doc.type}</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleFavorite('${doc.id}')" class="text-xs ${doc.isFavorite ? 'text-yellow-400' : 'text-slate-600 hover:text-slate-400'}">
+                        <i class="fa-solid fa-star"></i>
+                    </button>
+                `;
+                recentList.appendChild(item);
+            });
+
+            renderChecklist();
+        }
+
+        function renderChecklist() {
+            const list = document.getElementById('missingChecklist');
+            const items = [
+                { title: 'Passport / Identity', check: appState.documents.some(d => d.category === 'Identity') },
+                { title: 'Vehicle Documents', check: appState.documents.some(d => d.category === 'Vehicle & Transport') },
+                { title: 'Legal & Property', check: appState.documents.some(d => d.category === 'Legal & Property') }
+            ];
+
+            list.innerHTML = '';
+            items.forEach(i => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between text-xs py-1.5 border-b border-slate-700/50";
+                div.innerHTML = `
+                    <span class="text-slate-300">${i.title}</span>
+                    <span class="${i.check ? 'text-emerald-400 font-bold' : 'text-amber-400'}">
+                        <i class="fa-solid ${i.check ? 'fa-circle-check' : 'fa-circle-xmark'} mr-1"></i> ${i.check ? 'Vaulted' : 'Missing'}
+                    </span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function renderDocuments() {
+            const grid = document.getElementById('documentGrid');
+            const noDocs = document.getElementById('noDocsState');
+            const catFilter = document.getElementById('categoryFilter').value;
+            const sortBy = document.getElementById('sortBySelect').value;
+
+            let filtered = appState.documents.filter(d => !d.isPrivate);
+
+            if (catFilter !== 'ALL') {
+                filtered = filtered.filter(d => d.category === catFilter);
+            }
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'title') return a.title.localeCompare(b.title);
+                if (sortBy === 'expiry') return new Date(a.expiryDate || '9999') - new Date(b.expiryDate || '9999');
+                return 0;
+            });
+
+            grid.innerHTML = '';
+            if (filtered.length === 0) {
+                noDocs.classList.remove('hidden');
+            } else {
+                noDocs.classList.add('hidden');
+                filtered.forEach(doc => grid.appendChild(createDocCard(doc)));
+            }
+        }
+
+        function renderRenewalView() {
+            const grid = document.getElementById('renewalGrid');
+            const renewalDocs = appState.documents.filter(isDocumentNeedingRenewal);
+
+            grid.innerHTML = '';
+            if (renewalDocs.length === 0) {
+                grid.innerHTML = `<p class="text-slate-400 text-sm col-span-4 text-center py-8">No documents currently require renewal.</p>`;
+            } else {
+                renewalDocs.forEach(doc => grid.appendChild(createDocCard(doc, true)));
+            }
+        }
+
+        function renderFavoritesView() {
+            const grid = document.getElementById('favoritesGrid');
+            const favs = appState.documents.filter(d => d.isFavorite);
+            grid.innerHTML = '';
+            favs.forEach(doc => grid.appendChild(createDocCard(doc)));
+        }
+
+        function renderExpiryView() {
+            const list = document.getElementById('expiryList');
+            list.innerHTML = '';
+            
+            const expDocs = appState.documents.filter(d => d.expiryDate);
+            expDocs.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+            expDocs.forEach(doc => {
+                const item = document.createElement('div');
+                const isRed = isDocumentNeedingRenewal(doc);
+                item.className = `p-4 rounded-xl border flex justify-between items-center ${isRed ? 'bg-rose-950/30 border-rose-800' : 'bg-slate-800 border-slate-700'}`;
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-calendar-days ${isRed ? 'text-rose-400' : 'text-slate-400'}"></i>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">${doc.title}</h4>
+                            <p class="text-xs text-slate-400">${doc.category} • ${doc.type}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold ${isRed ? 'text-rose-400' : 'text-slate-300'}">${doc.expiryDate}</span>
+                        <p class="text-[10px] text-slate-400">${isRed ? 'Needs Renewal' : 'Active'}</p>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function createDocCard(doc, isRedAccent = false) {
+            const card = document.createElement('div');
+            const needsRenewal = isDocumentNeedingRenewal(doc);
+
+            card.className = `bg-slate-800 rounded-2xl p-4 border transition-all flex flex-col justify-between ${needsRenewal || isRedAccent ? 'border-rose-600/80 shadow-lg shadow-rose-950/20' : 'border-slate-700 hover:border-slate-600'}`;
+            
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${doc.isPrivate ? 'bg-emerald-900/40 text-emerald-400' : 'bg-brand-900/40 text-brand-400'}">${doc.category}</span>
+                        <button onclick="toggleFavorite('${doc.id}')" class="text-xs ${doc.isFavorite ? 'text-yellow-400' : 'text-slate-600 hover:text-slate-400'}">
+                            <i class="fa-solid fa-star"></i>
+                        </button>
+                    </div>
+
+                    <h3 class="font-bold text-slate-100 text-sm mb-1">${doc.title}</h3>
+                    <p class="text-xs text-slate-400 mb-3">${doc.type}</p>
+
+                    ${doc.expiryDate ? `
+                        <div class="text-xs p-2 rounded-xl mb-3 ${needsRenewal ? 'bg-rose-950/60 text-rose-300 border border-rose-800/80' : 'bg-slate-700/40 text-slate-300'}">
+                            <i class="fa-solid fa-clock mr-1"></i> Exp: <strong>${doc.expiryDate}</strong>
+                            ${needsRenewal ? `<div class="text-[10px] font-bold text-rose-400 mt-0.5">Moved to Needs Renewal</div>` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${doc.notes ? `<p class="text-[11px] text-slate-400 italic mb-3">"${doc.notes}"</p>` : ''}
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-slate-700/60 mt-2">
+                    <span class="text-[10px] text-slate-500">${doc.isPrivate ? 'Private Vault' : 'Standard'}</span>
+                    <button onclick="deleteDocument('${doc.id}')" class="text-xs text-slate-500 hover:text-rose-400 transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            `;
+            return card;
+        }
+
+        // ==========================================
+        // 5. VIEW NAVIGATION & ACTIONS
+        // ==========================================
+        function switchView(viewName) {
+            currentView = viewName;
+            
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+
+            const selectedView = document.getElementById(`view-${viewName}`);
+            if (selectedView) selectedView.classList.remove('hidden');
+
+            const navBtn = document.querySelector(`[data-view="${viewName}"]`);
+            if (navBtn) navBtn.classList.add('active-nav');
+
+            if (viewName === 'documents') renderDocuments();
+            if (viewName === 'renewal') renderRenewalView();
+            if (viewName === 'favorites') renderFavoritesView();
+            if (viewName === 'expiring') renderExpiryView();
+
+            updateStatsAndBadges();
+        }
+
+        function toggleFavorite(id) {
+            const doc = appState.documents.find(d => d.id === id);
+            if (doc) {
+                doc.isFavorite = !doc.isFavorite;
+                saveDocuments();
+                refreshCurrentView();
+            }
+        }
+
+        function deleteDocument(id) {
+            if (confirm("Delete this document?")) {
+                appState.documents = appState.documents.filter(d => d.id !== id);
+                saveDocuments();
+                refreshCurrentView();
+            }
+        }
+
+        function saveDocuments() {
+            localStorage.setItem('dv_documents', JSON.stringify(appState.documents));
+            updateStatsAndBadges();
+        }
+
+        function refreshCurrentView() {
+            switchView(currentView);
+            renderDashboard();
+        }
+
+        // ==========================================
+        // 6. MODALS & SUBMISSIONS
+        // ==========================================
+        function openUploadModal() {
+            renderCategories();
+            document.getElementById('uploadModal').classList.remove('hidden');
+        }
+
+        function closeUploadModal() {
+            document.getElementById('uploadModal').classList.add('hidden');
+            document.getElementById('docForm').reset();
+        }
+
+        function handleDocSubmit(e) {
+            e.preventDefault();
+
+            const newDoc = {
+                id: 'doc-' + Date.now(),
+                title: document.getElementById('docTitle').value.trim(),
+                type: document.getElementById('docType').value,
+                category: document.getElementById('docCategory').value,
+                expiryDate: document.getElementById('docExpiryDate').value || null,
+                isPrivate: document.getElementById('docIsPrivate').checked,
+                isFavorite: false,
+                notes: document.getElementById('docNotes').value.trim()
+            };
+
+            appState.documents.unshift(newDoc);
+            saveDocuments();
+            closeUploadModal();
+            refreshCurrentView();
+        }
+
+        function promptVaultUnlock() {
+            const pin = prompt(`Enter your ${appState.pinLength}-digit passcode to unlock vault:`);
+            if (pin === appState.passcode) {
+                isVaultUnlocked = true;
+                document.getElementById('vaultLockScreen').classList.add('hidden');
+                document.getElementById('vaultUnlockedContent').classList.remove('hidden');
+                renderVaultGrid();
+            } else if (pin !== null) {
+                alert("Incorrect Passcode.");
+            }
+        }
+
+        function relockVaultSection() {
+            isVaultUnlocked = false;
+            document.getElementById('vaultUnlockedContent').classList.add('hidden');
+            document.getElementById('vaultLockScreen').classList.remove('hidden');
+        }
+
+        function renderVaultGrid() {
+            const grid = document.getElementById('vaultGrid');
+            grid.innerHTML = '';
+            const vaultDocs = appState.documents.filter(d => d.isPrivate);
+            vaultDocs.forEach(doc => grid.appendChild(createDocCard(doc)));
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        function handleGlobalSearch() {
+            const query = document.getElementById('globalSearchInput').value.toLowerCase().trim();
+            const clearBtn = document.getElementById('clearSearchBtn');
+            
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+                switchView('documents');
+                const grid = document.getElementById('documentGrid');
+                grid.innerHTML = '';
+                
+                const matches = appState.documents.filter(d => 
+                    d.title.toLowerCase().includes(query) ||
+                    d.type.toLowerCase().includes(query) ||
+                    d.category.toLowerCase().includes(query) ||
+                    (d.notes && d.notes.toLowerCase().includes(query))
+                );
+
+                matches.forEach(doc => grid.appendChild(createDocCard(doc)));
+            } else {
+                clearBtn.classList.add('hidden');
+                renderDocuments();
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('globalSearchInput').value = '';
+            document.getElementById('clearSearchBtn').classList.add('hidden');
+            renderDocuments();
+        }
+    </script>
+</body>
+</html>
